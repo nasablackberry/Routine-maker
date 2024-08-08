@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Routine Maker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script>
+        function formatDuration(seconds) {
+            if (isNaN(seconds) || seconds < 0) return '0m 0s';
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes}m ${remainingSeconds}s`;
+        }
+
+        function updateCountdown(routines) {
+            routines.forEach((routine, index) => {
+                const listItem = document.getElementById(`routine-${index}`);
+                if (listItem) {
+                    const countdownElement = listItem.querySelector('.countdown');
+                    if (routine.start_time && !routine.end_time) {
+                        const startTime = new Date(routine.start_time).getTime();
+                        const now = new Date().getTime();
+                        const duration = routine.duration ? (routine.duration[0] * 60 + routine.duration[1]) : 0;
+                        const elapsed = Math.max((now - startTime) / 1000, 0);
+                        const remaining = Math.max(duration - elapsed, 0);
+                        countdownElement.textContent = formatDuration(remaining);
+                    } else {
+                        countdownElement.textContent = '';
+                    }
+                }
+            });
+        }
+
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const clock = document.getElementById('clock');
+            if (clock) {
+                clock.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+
+            socket.on('update_routines', (data) => {
+                const routinesList = document.getElementById('routines-list');
+                routinesList.innerHTML = '';
+
+                data.forEach((routine, index) => {
+                    const duration = routine.duration ? formatDuration(routine.duration[0] * 60 + routine.duration[1]) : '';
+                    
+                    const listItem = document.createElement('li');
+                    listItem.id = `routine-${index}`;
+                    listItem.innerHTML = `
+                        <div>
+                            <h2>${routine.name}</h2>
+                            ${routine.start_time ? `<p>Started at: ${routine.start_time}</p>` : ''}
+                            ${routine.end_time ? `<p>Stopped at: ${routine.end_time}</p>` : ''}
+                            ${routine.duration ? `<p>Duration: ${duration}</p>` : ''}
+                            <p class="countdown"></p>
+                            <div class="actions">
+                                <form action="/start/${index}" method="POST">
+                                    <button type="submit">Start Timer</button>
+                                </form>
+                                <form action="/stop/${index}" method="POST">
+                                    <button type="submit">Stop Timer</button>
+                                </form>
+                                <form action="/delete/${index}" method="POST">
+                                    <button type="submit">Delete</button>
+                                </form>
+                            </div>
+                        </div>
+                    `;
+                    routinesList.appendChild(listItem);
+                });
+
+                // Update countdown timers
+                updateCountdown(data);
+            });
+
+            // Update the clock every second
+            setInterval(updateClock, 1000);
+            updateClock();  // Initialize clock immediately
+        });
+    </script>
+    <style>
+        /* Basic styling */
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            margin: 10 10;
+            padding: 10 10;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+            font-family: Arial, sans-serif;
+        }
+
+        #clock {
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+
+        ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        li {
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            padding: 10px;
+        }
+
+        .actions {
+            margin-top: 10px;
+        }
+
+        button {
+            margin-right: 5px;
+        }
+
+        footer {
+            text-align: center;
+            padding: 10px;
+            background-color: #f1f1f1;
+            position: relative;
+            bottom: 0;
+            width: 100%;
+            font-size: 0.9em;
+            color: #333;
+            margin-top: auto; /* Pushes the footer to the bottom */
+        }
+    </style>
+</head>
+<body>
+    <h1>Routine Maker</h1>
+    
+    <div id="clock"></div>
+
+    <form action="{{ url_for('add_routine') }}" method="POST">
+        <input type="text" name="routine" placeholder="Enter a new routine" required>
+        <button type="submit">Add Routine</button>
+    </form>
+
+    <ul id="routines-list">
+        <!-- Routine items will be populated by JavaScript -->
+    </ul>
+
+    <footer>
+        Made with &lt;3 by Shivank
+    </footer>
+</body>
+</html>
